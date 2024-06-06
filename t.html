@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- <link rel="stylesheet" href="https://pyscript.net/alpha/pyscript.css" />
+    <script defer src="https://pyscript.net/alpha/pyscript.js"></script> -->
+
+    <title>Document</title>
+    <script>
+        function processFormData() {
+            const form = document.forms['form']
+            const account = form.elements.account.value;
+            const password = form.elements.password.value;
+
+            document.write(account + password)
+        }
+    </script>
+
+    <style>
+        .form-example{
+            display: table;
+        }
+        div.form-example {
+            display: table-row;
+        }
+
+        label,
+        input {
+            display: table-cell;
+            margin-bottom: 10px;
+        }
+
+        label {
+            padding-right: 10px;
+        }
+    </style>
+</head>
+<body>
+    <form action="tt.js" method="get/post" class="form-example">
+        <div class="form-example">
+            <label for="account">賬號：</label>
+            <input type="txet" name="account" id="account" required />
+        </div>
+        <div class="form-example">
+            <label for="password">密碼：</label>
+            <input type="text" name="password" id="password" required />
+        </div>
+            <div class="form-example">
+            <input type="submit" value="確認" />
+        </div>
+    </form>
+    <script language="javascript">
+        function post() {
+            Post.action = "NextPage.aspx";
+            Post.submit();
+        } 
+        
+    </script>
+    
+</body>
+</html>
