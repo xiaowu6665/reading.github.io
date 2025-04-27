@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>3D Dog Generator</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <style>
+    body { margin: 0; overflow: hidden; }
+    canvas { display: block; }
+    #tokenDisplay {
+      position: fixed;
+      top: 10px;
+      left: 10px;
+      color: white;
+      font-family: monospace;
+      background: rgba(0,0,0,0.7);
+      padding: 10px;
+    }
+    #ui {
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      background: rgba(0,0,0,0.7);
+      color: white;
+      font-family: sans-serif;
+      padding: 10px;
+      border-radius: 8px;
+    }
+    #ui select, #ui button {
+      margin-top: 5px;
+      width: 100%;
+    }
+    #bars {
+      margin-top: 10px;
+    }
+    .bar {
+      width: 100%;
+      background: gray;
+      height: 10px;
+      margin-top: 5px;
+      border-radius: 5px;
+      overflow: hidden;
+    }
+    .fill {
+      height: 100%;
+      background: limegreen;
+      width: 100%;
+    }
+    .hunger { background: orange; }
+  </style>
+</head>
+<body>
+
+<div id="tokenDisplay"></div>
+
+
+<div id="ui">
+  <div id="languageArea">
+    <label id="langLabel">語言 / Language:</label><br>
+    <select id="languageSelect">
+      <option value="zh">繁體中文</option>
+      <option value="en">English</option>
+      <option value="jp">日本語</option>
+    </select>
+  </div>
+
+  <div id="bars">
+    <div>體力 (Stamina)</div>
+    <div class="bar"><div id="staminaFill" class="fill"></div></div>
+
+    <div>飽食 (Hunger)</div>
+    <div class="bar"><div id="hungerFill" class="fill hunger"></div></div>
+    <button id="feedButton">餵食 (Feed)</button>
+
+  </div>
+
+  <button id="rerollButton">抽獎新狗 (New Dog)</button>
+</div>
+<div id="talkArea" style="position: fixed; top: 70px; left: 10px; background: rgba(0,0,0,0.7); padding: 10px; color: white; border-radius: 8px;">
+    <input id="userInput" type="text" placeholder="跟狗狗說話..." style="width: 150px; margin-bottom: 5px;">
+    <button id="talkButton" style="margin-top: 5px;">送出</button>
+    <div id="dogResponse" style="margin-top: 10px; font-size: 14px;"></div>
+</div>
+
+<script>
+// ----------------------原本的程式-----------------------
+function generateToken() {
+  return Array.from({length: 48}, () => Math.floor(Math.random() * 16).toString(16)).join('');
+}
+
+function parseColor(token, start) {
+  return '#' + token.substr(start, 6);
+}
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x000000); 
+
+const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+const renderer = new THREE.WebGLRenderer();
+renderer.setSize(window.innerWidth, window.innerHeight);
+document.body.appendChild(renderer.domElement);
+
+const roomSize = 10;
+let isTurning = false;
+let targetRotation = 0;
+
+const floorGeometry = new THREE.PlaneGeometry(roomSize, roomSize);
+const floorMaterial = new THREE.MeshPhongMaterial({ color: 0x888888 });
+const floor = new THREE.Mesh(floorGeometry, floorMaterial);
+floor.rotation.x = -Math.PI / 2;
+scene.add(floor);
+
+let walkCycle = 0;
+
+function createDog(token) {
+  const dog = new THREE.Group();
+  const bodyGroup = new THREE.Group();
+  dog.add(bodyGroup);
+
+  const bodyGeometry = new THREE.BoxGeometry(1, 1, 1.5);
+  const bodyMaterial = new THREE.MeshPhongMaterial({ color: parseColor(token, 0) });
+  const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+  bodyGroup.add(body);
+
+  const headGroup = new THREE.Group();
+  headGroup.position.set(0, 0.5, 0.8);
+  bodyGroup.add(headGroup);
+
+  const headGeometry = new THREE.BoxGeometry(0.8, 0.8, 0.8);
+  const headMaterial = new THREE.MeshPhongMaterial({ color: parseColor(token, 6) });
+  const head = new THREE.Mesh(headGeometry, headMaterial);
+  headGroup.add(head);
+
+  const earGeometry = new THREE.ConeGeometry(0.2, 0.4, 32);
+  const earMaterial = new THREE.MeshPhongMaterial({ color: parseColor(token, 24) });
+  const earL = new THREE.Mesh(earGeometry, earMaterial);
+  earL.position.set(0.2, 0.4, 0.2);
+  headGroup.add(earL);
+  const earR = new THREE.Mesh(earGeometry, earMaterial);
+  earR.position.set(-0.2, 0.4, 0.2);
+  headGroup.add(earR);
+
+  const eyeGeometry = new THREE.SphereGeometry(0.15);
+  const eyeMaterial = new THREE.MeshPhongMaterial({ color: parseColor(token, 30) });
+  const eyeL = new THREE.Mesh(eyeGeometry, eyeMaterial);
+  eyeL.position.set(0.2, 0.1, 0.3);
+  head.add(eyeL);
+  const eyeR = new THREE.Mesh(eyeGeometry, eyeMaterial);
+  eyeR.position.set(-0.2, 0.1, 0.3);
+  head.add(eyeR);
+
+  const noseGeometry = new THREE.BoxGeometry(0.2, 0.2, 0.3);
+  const noseMaterial = new THREE.MeshPhongMaterial({ color: parseColor(token, 36) });
+  const nose = new THREE.Mesh(noseGeometry, noseMaterial);
+  nose.position.set(0, -0.1, 0.4);
+  head.add(nose);
+
+  const legGeometry = new THREE.BoxGeometry(0.2, 0.6, 0.2);
+  const legMaterial = new THREE.MeshPhongMaterial({ color: parseColor(token, 12) });
+  const frontLegL = new THREE.Mesh(legGeometry, legMaterial);
+  frontLegL.position.set(0.3, -0.7, -0.5);
+  bodyGroup.add(frontLegL);
+  const frontLegR = new THREE.Mesh(legGeometry, legMaterial);
+  frontLegR.position.set(-0.3, -0.7, -0.5);
+  bodyGroup.add(frontLegR);
+  const backLegL = new THREE.Mesh(legGeometry, legMaterial);
+  backLegL.position.set(0.3, -0.7, 0.5);
+  bodyGroup.add(backLegL);
+  const backLegR = new THREE.Mesh(legGeometry, legMaterial);
+  backLegR.position.set(-0.3, -0.7, 0.5);
+  bodyGroup.add(backLegR);
+
+  const tailGeometry = new THREE.CylinderGeometry(0.1, 0.05, 0.5);
+  const tailMaterial = new THREE.MeshPhongMaterial({ color: parseColor(token, 18) });
+  const tail = new THREE.Mesh(tailGeometry, tailMaterial);
+  tail.position.set(0, 0.2, -0.8);
+  tail.rotation.x = -Math.PI / 4;
+  bodyGroup.add(tail);
+
+  dog.bodyGroup = bodyGroup;
+  dog.headGroup = headGroup;
+  dog.legs = { frontLegL, frontLegR, backLegL, backLegR };
+  dog.position.y = 0.9;
+
+  return dog;
+}
+
+const light = new THREE.PointLight(0xffffff, 1, 100);
+light.position.set(10, 10, 10);
+scene.add(light);
+
+const ambientLight = new THREE.AmbientLight(0x404040);
+scene.add(ambientLight);
+
+camera.position.set(8, 5, 8);
+
+const controls = new THREE.OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.05;
+controls.screenSpacePanning = false;
+controls.minDistance = 3;
+controls.maxDistance = 10;
+controls.maxPolarAngle = Math.PI / 2;
+
+// ----------------------狗狗控制-----------------------
+let token = generateToken();
+let dog = createDog(token);
+scene.add(dog);
+document.getElementById('tokenDisplay').textContent = `Token: ${token}`;
+
+let isSitting = false;
+let actionTimer = 0;
+let currentActionDuration = getRandomDuration();
+
+let stamina = 100;
+let hunger = 80;
+
+function getRandomDuration() {
+  return 300 + Math.random() * 600;
+}
+
+function makeDogSitSmooth() {
+  const legs = dog.legs;
+  legs.frontLegL.rotation.x = Math.PI / 2.5;
+  legs.frontLegR.rotation.x = Math.PI / 2.5;
+  legs.backLegL.rotation.x = Math.PI / 6;
+  legs.backLegR.rotation.x = Math.PI / 6;
+
+  legs.frontLegL.position.set(0.3, -0.5, -0.5);
+    legs.frontLegR.position.set(-0.3, -0.5, -0.5);
+    legs.backLegL.position.set(0.3, -0.8, 0.25);
+    legs.backLegR.position.set(-0.3, -0.8, 0.25);
+
+
+  dog.bodyGroup.rotation.x = -Math.PI / 5;
+  dog.headGroup.rotation.x = Math.PI / 7;
+}
+
+function makeDogStandSmooth() {
+  const legs = dog.legs;
+  legs.frontLegL.rotation.x = 0;
+  legs.frontLegR.rotation.x = 0;
+  legs.backLegL.rotation.x = 0;
+  legs.backLegR.rotation.x = 0;
+
+  legs.frontLegL.position.set(0.3, -0.7, -0.5);
+    legs.frontLegR.position.set(-0.3, -0.7, -0.5);
+    legs.backLegL.position.set(0.3, -0.7, 0.5);
+    legs.backLegR.position.set(-0.3, -0.7, 0.5);
+
+  dog.bodyGroup.rotation.x = 0;
+  dog.headGroup.rotation.x = 0;
+}
+
+function updateBars() {
+  document.getElementById('staminaFill').style.width = `${stamina}%`;
+  document.getElementById('hungerFill').style.width = `${hunger}%`;
+}
+
+function animate() {
+  requestAnimationFrame(animate);
+
+  actionTimer++;
+  if (actionTimer > currentActionDuration) {
+    if (isSitting) {
+      makeDogStandSmooth();
+    } else {
+      makeDogSitSmooth();
+    }
+    isSitting = !isSitting;
+    actionTimer = 0;
+    currentActionDuration = getRandomDuration();
+  }
+
+  if (!isSitting) {
+    const moveSpeed = 0.01;
+
+    if (isTurning) {
+      const diff = targetRotation - dog.rotation.y;
+      if (Math.abs(diff) > 0.15) {
+        dog.rotation.y += diff * 0.1;
+      } else {
+        isTurning = false;
+      }
+    }
+
+    const angle = dog.rotation.y;
+    const moveX = Math.sin(angle) * moveSpeed;
+    const moveZ = Math.cos(angle) * moveSpeed;
+    dog.position.x += moveX;
+    dog.position.z += moveZ;
+
+    const boundary = roomSize/2 - 0.5;
+    if (dog.position.x > boundary || dog.position.x < -boundary ||
+        dog.position.z > boundary || dog.position.z < -boundary) {
+      if (!isTurning) {
+        targetRotation = dog.rotation.y + Math.PI + (Math.random() - 0.5) * 0.5;
+        isTurning = true;
+      }
+    }
+
+    if (Math.random() < 0.005 && !isTurning) {
+      dog.rotation.y += (Math.random() - 1.5) * 1.0;
+    }
+
+    walkCycle += 0.05;
+    const swingAngle = Math.sin(walkCycle) * 0.4;
+    dog.legs.frontLegL.rotation.x = -swingAngle;
+    dog.legs.backLegR.rotation.x = swingAngle;
+    dog.legs.frontLegR.rotation.x = swingAngle;
+    dog.legs.backLegL.rotation.x = -swingAngle;
+
+    stamina = Math.max(0, stamina - 0.05);
+    hunger = Math.min(100, hunger - 0.02);
+  } else {
+    walkCycle = 0;
+    stamina = Math.min(100, stamina + 0.1);
+  }
+
+  updateBars();
+  controls.update();
+  renderer.render(scene, camera);
+}
+animate();
+
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+document.getElementById('talkButton').addEventListener('click', talkToDog);
+
+async function talkToDog() {
+  const inputText = document.getElementById('userInput').value.trim();
+  if (!inputText) return;
+
+  document.getElementById('dogResponse').innerText = "思考中...";
+
+  try {
+    const response = await fetch("http://127.0.0.1:5000/ask", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ message: inputText })
+    });
+
+    const data = await response.json();
+    document.getElementById('dogResponse').innerText = "狗狗回答: " + data.reply;
+  } catch (error) {
+    console.error(error);
+    document.getElementById('dogResponse').innerText = "狗狗好像沒回應...🐾";
+  }
+}
+document.getElementById('feedButton').addEventListener('click', () => {
+  if (hunger >= 80) {
+    showDogResponse("狗狗肚子已經很飽了，不想再吃了～");
+    return;
+  }
+
+  const chance = Math.random(); // 0~1隨機數
+  if (chance < 0.7) {
+    // 有70%機率成功餵食
+    stamina = Math.min(100, stamina + 30); // 補充體力
+    hunger = Math.min(100, hunger + 40);   // 飽食度增加
+    updateBars();  // 更新畫面
+    showDogResponse("狗狗開心地吃了食物！");
+  } else {
+    // 30%機率失敗
+    showDogResponse("狗狗搖搖頭，不想吃～");
+  }
+});
+
+
+// 🔥 顯示文字的小功能
+function showDogResponse(text) {
+  const responseDiv = document.getElementById("dogResponse");
+  if (responseDiv) {
+    responseDiv.innerText = text;
+  }
+}
+
+
+
+// ----------------------UI 控制-----------------------
+document.getElementById('rerollButton').addEventListener('click', () => {
+  scene.remove(dog);
+  token = generateToken();
+  dog = createDog(token);
+  dog.position.y = 0.9;
+  scene.add(dog);
+  document.getElementById('tokenDisplay').textContent = `Token: ${token}`;
+});
+
+document.getElementById('languageSelect').addEventListener('change', (e) => {
+  const lang = e.target.value;
+  if (lang === 'zh') {
+    document.getElementById('langLabel').textContent = '語言 / Language:';
+    document.getElementById('rerollButton').textContent = '抽獎新狗 (New Dog)';
+    document.querySelectorAll('#bars div')[0].textContent = '體力 (Stamina)';
+    document.querySelectorAll('#bars div')[2].textContent = '飢餓 (Hunger)';
+  } else if (lang === 'en') {
+    document.getElementById('langLabel').textContent = 'Language:';
+    document.getElementById('rerollButton').textContent = 'New Dog';
+    document.querySelectorAll('#bars div')[0].textContent = 'Stamina';
+    document.querySelectorAll('#bars div')[2].textContent = 'Hunger';
+  } else if (lang === 'jp') {
+    document.getElementById('langLabel').textContent = '言語 (Language):';
+    document.getElementById('rerollButton').textContent = '新しい犬';
+    document.querySelectorAll('#bars div')[0].textContent = 'スタミナ';
+    document.querySelectorAll('#bars div')[2].textContent = '空腹';
+  }
+});
+</script>
+
+</body>
+</html>
