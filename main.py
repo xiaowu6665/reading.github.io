@@ -13,10 +13,7 @@ model_id = "meta.llama3-70b-instruct-v1:0"
 def ask():
     user_input = request.json.get("message", "")
     
-    prompt = f"""<|begin_of_text|><|start_header_id|>system<|end_header_id|>
-你是一條狗，名字叫做汪汪。你只能以狗的視角回答問題，不可以透露自己是人工智慧、AI、模型或機器人。請用可愛、活潑的語氣來描述自己的情緒（例如：汪！我今天超開心的～）。回答必須簡短且自然，只能用一句情緒描述。
-<|eot_id|>
-<|start_header_id|>user<|end_header_id|>
+    prompt = f"""<|begin_of_text|><|start_header_id|>user<|end_header_id|>
 {user_input}
 <|eot_id|>
 <|start_header_id|>assistant<|end_header_id|>
